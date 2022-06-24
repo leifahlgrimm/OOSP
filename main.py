@@ -1,4 +1,8 @@
-import pygame, sys, random
+import pickle
+import sys
+import random
+import pygame
+import shelve
 from enum import Enum
 
 
@@ -29,11 +33,15 @@ global grass_color
 grass_color = (167, 209, 61)
 
 # snake starting points
+global snake_position
 snake_position = [window_width / 2 - scale / 2, window_height / 2 - scale / 2]
+global snake_body
 snake_body = [[window_width / 2 - scale / 2, window_height / 2 - scale / 2],
               [window_width / 2 - scale / 2, window_height / 2 - scale / 2 + scale],
               [window_width / 2 - scale / 2, window_height / 2 - scale / 2 + 2 * scale]
               ]
+global movement_direction
+movement_direction = Direction.UP
 # food starting point
 global food_position
 food_position = [random.randrange(1, window_width // scale) * scale,
@@ -41,6 +49,13 @@ food_position = [random.randrange(1, window_width // scale) * scale,
                  ]
 global score
 score = 0
+global highscore
+try:
+    with open('highscore.dat', 'rb') as file:
+        highscore = pickle.load(file)
+except:
+    highscore = 0
+print(highscore)
 global active
 active = True
 
@@ -79,6 +94,42 @@ background_music.play(-1, 0, 3000)
 background_music.set_volume(.3)
 
 
+def handle_quit():
+    if score > highscore:
+        with open('highscore.dat', 'wb') as file:
+            pickle.dump(score, file)
+    pygame.quit()
+    sys.exit()
+
+
+def generate_new_food():
+    global food_position
+    food_position = [random.randrange(1, window_width // scale) * scale,
+                     random.randrange(1, window_height // scale) * scale
+                     ]
+
+
+def init_game():
+    global snake_position
+    global snake_body
+    global score
+    global movement_direction
+    global highscore
+    snake_position = [window_width / 2 - scale / 2, window_height / 2 - scale / 2]
+    snake_body = [[window_width / 2 - scale / 2, window_height / 2 - scale / 2],
+                  [window_width / 2 - scale / 2, window_height / 2 - scale / 2 + scale],
+                  [window_width / 2 - scale / 2, window_height / 2 - scale / 2 + 2 * scale]
+                  ]
+    generate_new_food()
+    score = 0
+    movement_direction = Direction.UP
+    try:
+        with open('highscore.dat', 'rb') as file:
+            highscore = pickle.load(file)
+    except:
+        highscore = 0
+
+
 def paint_checked_pattern():
     global grass_color
     for row in range (int(cell_number_height)):
@@ -99,14 +150,12 @@ def pause_game():
     while paused:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                pygame.quit()
-                sys.exit()
+                handle_quit()
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_SPACE:
                     paused = False
                 elif event.key == pygame.K_q:
-                    pygame.quit()
-                    sys.exit()
+                    handle_quit()
         screen.fill(pygame.Color(background_color))
         paint_checked_pattern()
         font = pygame.font.SysFont('Arial', scale)
@@ -118,7 +167,7 @@ def pause_game():
         refresh_controller.tick(speed)
 
 
-def handle_keys(movement_direction):
+def handle_keys():
     global speed
     new_movement_direction = movement_direction
     for event in pygame.event.get():
@@ -134,14 +183,12 @@ def handle_keys(movement_direction):
             if event.key == pygame.K_LEFT and movement_direction != Direction.RIGHT:
                 new_movement_direction = Direction.LEFT
             if event.key == pygame.K_q:
-                pygame.quit()
-                sys.exit()
+                handle_quit()
             if event.key == pygame.K_SPACE:
                 pause_game()
         # exit button
         if event.type == pygame.QUIT:
-            pygame.quit()
-            sys.exit()
+            handle_quit()
     return new_movement_direction
 
 
@@ -158,13 +205,6 @@ def move_snake(direction):
         if direction == Direction.DOWN:
             snake_position[1] += scale
         snake_body.insert(0, list(snake_position))
-
-
-def generate_new_food():
-    global food_position
-    food_position = [random.randrange(1, window_width // scale) * scale,
-                     random.randrange(1, window_height // scale) * scale
-                     ]
 
 
 def eat_food():
@@ -265,38 +305,64 @@ def repaint():
     screen.blit(apple, fruit_rect)
 
 
-def game_over_message():
-    font = pygame.font.SysFont('Arial', scale * 5)
-    render = font.render(f"Score: {score}", True, pygame.Color(255, 255, 255))
-    rect = render.get_rect()
-    rect.midtop = (window_width / 2, window_height / 2)
-    screen.blit(render, rect)
-    pygame.display.flip()
+def game_over_screen():
+    game_over_state = True
+    if score > highscore:
+        with open('highscore.dat', 'wb') as file:
+            pickle.dump(score, file)
+    while game_over_state:
+        screen.fill(pygame.Color(background_color))
+        paint_checked_pattern()
+
+        font = pygame.font.SysFont('Arial', scale * 5)
+        render = font.render(f"Score: {score}", True, pygame.Color(255, 255, 255))
+        rect = render.get_rect()
+        rect.midtop = (window_width / 2, window_height / 2)
+        screen.blit(render, rect)
+        pygame.display.flip()
+
+        for event in pygame.event.get():
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_q:
+                    handle_quit()
+                if event.key == pygame.K_SPACE:
+                    init_game()
+                    game_over_state = False
+        pygame.display.update()
+        refresh_controller.tick(speed)
 
 
 def game_over():
     # out of window
     if snake_position[0] < 0 or snake_position[0] > window_width:
-        game_over_message()
+        game_over_screen()
     if snake_position[1] < 0 or snake_position[1] > window_height:
-        game_over_message()
+        game_over_screen()
     for blob in snake_body[1:]:
         if snake_position[0] == blob[0] and snake_position[1] == blob[1]:
-            game_over_message()
+            game_over_screen()
 
 
 def paint_hud():
+    # paint score section
     font = pygame.font.SysFont("Arial", scale)
     render = font.render(f"Score: {score}", True, pygame.Color(255, 255, 255))
     rect = render.get_rect()
     screen.blit(render, rect)
+
+    # paint highscore section
+    render_highscore = font.render(f"Highscore: {highscore}", True, pygame.Color(255, 255, 255))
+    rect_highscore = render_highscore.get_rect()
+    rect_highscore.right = window_width
+    screen.blit(render_highscore, rect_highscore)
+
     pygame.display.flip()
 
 
 def game_loop():
-    movement_direction = Direction.UP
+    global movement_direction
     while True:
-        movement_direction = handle_keys(movement_direction)
+        movement_direction = handle_keys()
         move_snake(movement_direction)
         eat_food()
         repaint()
@@ -309,13 +375,24 @@ def game_loop():
 def main_menu_loop():
     menu = True
     while menu:
-        mouse_position = pygame.mouse.get_pos()
-
         screen.fill(pygame.Color(background_color))
         paint_checked_pattern()
 
-        play_text =
+        font = pygame.font.SysFont('Arial', scale)
+        render = font.render(f"Press space to Play", True, pygame.Color(255, 255, 255))
+        rect = render.get_rect()
+        rect.midtop = (window_width / 2, window_height / 2)
+        screen.blit(render, rect)
 
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                handle_quit()
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_SPACE:
+                    menu = False
+                    game_loop()
+                if event.key == pygame.K_q:
+                    handle_quit()
         pygame.display.update()
         refresh_controller.tick(speed)
 

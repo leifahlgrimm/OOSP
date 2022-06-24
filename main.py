@@ -2,7 +2,7 @@ import pickle
 import sys
 import random
 import pygame
-import shelve
+import config
 from enum import Enum
 
 
@@ -13,62 +13,33 @@ class Direction(Enum):
     LEFT = 4
 
 
-# the scale of the grid
-scale = 40
 # window properties
-window_width = 1000
-window_height = 1000
-global cell_number_width
-cell_number_width = window_width / scale
-global cell_number_height
-cell_number_height = window_height / scale
+cell_number_x = config.window_width / config.tile_size
+cell_number_y = config.window_height / config.tile_size
 refresh_controller = pygame.time.Clock()
-global speed
-speed = 5
-
-# colors
-global background_color
-background_color= (175,215,70)
-global grass_color
-grass_color = (167, 209, 61)
 
 # snake starting points
-global snake_position
-snake_position = [window_width / 2 - scale / 2, window_height / 2 - scale / 2]
-global snake_body
-snake_body = [[window_width / 2 - scale / 2, window_height / 2 - scale / 2],
-              [window_width / 2 - scale / 2, window_height / 2 - scale / 2 + scale],
-              [window_width / 2 - scale / 2, window_height / 2 - scale / 2 + 2 * scale]
-              ]
-global movement_direction
-movement_direction = Direction.UP
+snake_position = None
+snake_body = None
+movement_direction = None
 # food starting point
-global food_position
-food_position = [random.randrange(1, window_width // scale) * scale,
-                 random.randrange(1, window_height // scale) * scale
-                 ]
-global score
+food_position = None
+highscore = 0
 score = 0
-global highscore
-try:
-    with open('highscore.dat', 'rb') as file:
-        highscore = pickle.load(file)
-except:
-    highscore = 0
-print(highscore)
-global active
-active = True
 
 pygame.init()
-pygame.display.set_caption("Snake OOSP")
-screen = pygame.display.set_mode((window_width, window_height), pygame.SCALED | pygame.FULLSCREEN, vsync=1)
+pygame.display.set_caption(config.caption)
+app_icon = pygame.image.load('img/head_up.png')
+pygame.display.set_icon(app_icon)
+screen = pygame.display.set_mode((config.window_width, config.window_height), pygame.SCALED, vsync=1)
+game_state = None
 
 # load food graphic
 apple = pygame.image.load('img/apple.png').convert_alpha()
 
 # load snake graphics
-global head
-global tail
+head = None
+tail = None
 # head graphics
 head_up = pygame.image.load('img/head_up.png').convert_alpha()
 head_down = pygame.image.load('img/head_down.png').convert_alpha()
@@ -87,25 +58,26 @@ body_tl = pygame.image.load('img/body_tl.png').convert_alpha()
 body_br = pygame.image.load('img/body_br.png').convert_alpha()
 body_bl = pygame.image.load('img/body_bl.png').convert_alpha()
 
-# load sounds
+# load sound effects and background music
 crunch_sound = pygame.mixer.Sound('sound/crunch.wav')
 background_music = pygame.mixer.Sound('sound/background.mp3')
 background_music.play(-1, 0, 3000)
-background_music.set_volume(.3)
+background_music_running = True
+background_music.set_volume(config.music_volume)
 
 
-def handle_quit():
+def exit_application():
     if score > highscore:
-        with open('highscore.dat', 'wb') as file:
-            pickle.dump(score, file)
+        with open('highscore.dat', 'wb') as highscore_file:
+            pickle.dump(score, highscore_file)
     pygame.quit()
     sys.exit()
 
 
 def generate_new_food():
     global food_position
-    food_position = [random.randrange(1, window_width // scale) * scale,
-                     random.randrange(1, window_height // scale) * scale
+    food_position = [random.randrange(1, config.window_width // config.tile_size) * config.tile_size,
+                     random.randrange(1, config.window_height // config.tile_size) * config.tile_size
                      ]
 
 
@@ -115,114 +87,140 @@ def init_game():
     global score
     global movement_direction
     global highscore
-    snake_position = [window_width / 2 - scale / 2, window_height / 2 - scale / 2]
-    snake_body = [[window_width / 2 - scale / 2, window_height / 2 - scale / 2],
-                  [window_width / 2 - scale / 2, window_height / 2 - scale / 2 + scale],
-                  [window_width / 2 - scale / 2, window_height / 2 - scale / 2 + 2 * scale]
+    snake_position = [config.window_width / 2 - config.tile_size / 2, config.window_height / 2 - config.tile_size / 2]
+    snake_body = [[config.window_width / 2 - config.tile_size / 2, config.window_height / 2 - config.tile_size / 2],
+                  [config.window_width / 2 - config.tile_size / 2,
+                   config.window_height / 2 - config.tile_size / 2 + config.tile_size],
+                  [config.window_width / 2 - config.tile_size / 2,
+                   config.window_height / 2 - config.tile_size / 2 + 2 * config.tile_size]
                   ]
     generate_new_food()
     score = 0
     movement_direction = Direction.UP
     try:
-        with open('highscore.dat', 'rb') as file:
-            highscore = pickle.load(file)
+        with open('highscore.dat', 'rb') as highscore_file:
+            highscore = pickle.load(highscore_file)
     except:
         highscore = 0
 
 
 def paint_checked_pattern():
-    global grass_color
-    for row in range (int(cell_number_height)):
+    for row in range(int(cell_number_y)):
         if row % 2 == 0:
-            for col in range(int(cell_number_width)):
+            for col in range(int(cell_number_x)):
                 if col % 2 == 0:
-                    grass_rect = pygame.Rect(col * scale, row * scale, scale, scale)
-                    pygame.draw.rect(screen, grass_color, grass_rect)
+                    grass_rect = pygame.Rect(col * config.tile_size, row * config.tile_size, config.tile_size,
+                                             config.tile_size)
+                    pygame.draw.rect(screen, config.grass_color, grass_rect)
         else:
-            for col in range(int(cell_number_width)):
+            for col in range(int(cell_number_x)):
                 if col % 2 != 0:
-                    grass_rect = pygame.Rect(col * scale, row * scale, scale, scale)
-                    pygame.draw.rect(screen, grass_color, grass_rect)
+                    grass_rect = pygame.Rect(col * config.tile_size, row * config.tile_size, config.tile_size,
+                                             config.tile_size)
+                    pygame.draw.rect(screen, config.grass_color, grass_rect)
 
 
 def pause_game():
-    paused = True
-    while paused:
+    global game_state
+    game_state = "paused"
+    while game_state == "paused":
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                handle_quit()
+                exit_application()
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_SPACE:
-                    paused = False
-                elif event.key == pygame.K_q:
-                    handle_quit()
-        screen.fill(pygame.Color(background_color))
+                    game_state = "game"
+                elif event.key == pygame.K_q or event.key == pygame.K_ESCAPE:
+                    exit_application()
+
+        # paint background
+        screen.fill(pygame.Color(config.background_color))
         paint_checked_pattern()
-        font = pygame.font.SysFont('Arial', scale)
-        render = font.render(f"Paused, to continue press Space, to quit press Q", True, pygame.Color(0, 0, 0))
+
+        # paint pause screen overlay
+        font = pygame.font.SysFont(config.font, config.tile_size)
+        render = font.render(f"Paused, to continue press Space, to quit press Q", True, pygame.Color(config.font_color))
         rect = render.get_rect()
-        rect.midtop = (window_width / 2, window_height / 2)
+        rect.midtop = (config.window_width / 2, config.window_height / 2)
         screen.blit(render, rect)
+
         pygame.display.update()
-        refresh_controller.tick(speed)
+        refresh_controller.tick(config.speed)
+
+
+def toggle_background_music():
+    global background_music_running
+    if background_music_running:
+        background_music.stop()
+        background_music_running = False
+    else:
+        background_music.play(-1, 0, 3000)
+        background_music.set_volume(.3)
+        background_music_running = True
 
 
 def handle_keys():
-    global speed
     new_movement_direction = movement_direction
     for event in pygame.event.get():
         # if key/button is pressed
         if event.type == pygame.KEYDOWN:
-            # movement keys
-            if event.key == pygame.K_UP and movement_direction != Direction.DOWN:
-                new_movement_direction = Direction.UP
-            if event.key == pygame.K_DOWN and movement_direction != Direction.UP:
-                new_movement_direction = Direction.DOWN
-            if event.key == pygame.K_RIGHT and movement_direction != Direction.LEFT:
-                new_movement_direction = Direction.RIGHT
-            if event.key == pygame.K_LEFT and movement_direction != Direction.RIGHT:
-                new_movement_direction = Direction.LEFT
-            if event.key == pygame.K_q:
-                handle_quit()
-            if event.key == pygame.K_SPACE:
-                pause_game()
+            # during game stage
+            if game_state == "game":
+                if (event.key == pygame.K_UP or event.key == pygame.K_w) and movement_direction != Direction.DOWN:
+                    new_movement_direction = Direction.UP
+                if (event.key == pygame.K_DOWN or event.key == pygame.K_s) and movement_direction != Direction.UP:
+                    new_movement_direction = Direction.DOWN
+                if (event.key == pygame.K_RIGHT or event.key == pygame.K_d) and movement_direction != Direction.LEFT:
+                    new_movement_direction = Direction.RIGHT
+                if (event.key == pygame.K_LEFT or event.key == pygame.K_a) and movement_direction != Direction.RIGHT:
+                    new_movement_direction = Direction.LEFT
+                if event.key == pygame.K_SPACE:
+                    pause_game()
+            # during main menu
+            if game_state == "menu":
+                if event.key == pygame.K_SPACE:
+                    game_loop()
+            # everywhere
+            if event.key == pygame.K_m:
+                toggle_background_music()
+            if event.key == pygame.K_q or event.key == pygame.K_ESCAPE:
+                exit_application()
         # exit button
         if event.type == pygame.QUIT:
-            handle_quit()
+            exit_application()
     return new_movement_direction
 
 
 # movement is done by always adding the snake position to the very front of it
 # and keeping it there in case food was eaten or removing it if no food was eaten in eat_food()
 def move_snake(direction):
-    if active:
+    if True:
         if direction == Direction.LEFT:
-            snake_position[0] -= scale
+            snake_position[0] -= config.tile_size
         if direction == Direction.RIGHT:
-            snake_position[0] += scale
+            snake_position[0] += config.tile_size
         if direction == Direction.UP:
-            snake_position[1] -= scale
+            snake_position[1] -= config.tile_size
         if direction == Direction.DOWN:
-            snake_position[1] += scale
+            snake_position[1] += config.tile_size
         snake_body.insert(0, list(snake_position))
 
 
 def eat_food():
-    global score, active
-    if active:
-        if snake_position[0] == food_position[0] and snake_position[1] == food_position[1]:
-            score += 10
-            crunch_sound.play()
-            generate_new_food()
-        else:
-            # If no food was eaten, remove end of snake
-            snake_body.pop()
+    global score
+    if snake_position[0] == food_position[0] and snake_position[1] == food_position[1]:
+        score += 10
+        crunch_sound.play()
+        generate_new_food()
+    else:
+        # If no food was eaten, remove end of snake
+        snake_body.pop()
 
 
 def update_head_graphics():
     global head
-    head_x_direction = (snake_body[1][0] - snake_body[0][0]) / scale
-    head_y_direction = (snake_body[1][1] - snake_body[0][1]) / scale
+    head_x_direction = (snake_body[1][0] - snake_body[0][0]) / config.tile_size
+    head_y_direction = (snake_body[1][1] - snake_body[0][1]) / config.tile_size
 
     if head_x_direction == 1.0:
         head = head_left
@@ -236,8 +234,8 @@ def update_head_graphics():
 
 def update_tail_graphics():
     global tail
-    tail_x_direction = (snake_body[-2][0] - snake_body[-1][0]) / scale
-    tail_y_direction = (snake_body[-2][1] - snake_body[-1][1]) / scale
+    tail_x_direction = (snake_body[-2][0] - snake_body[-1][0]) / config.tile_size
+    tail_y_direction = (snake_body[-2][1] - snake_body[-1][1]) / config.tile_size
 
     if tail_x_direction == 1.0:
         tail = tail_left
@@ -251,12 +249,12 @@ def update_tail_graphics():
 
 def repaint():
     # paint background
-    screen.fill(pygame.Color(background_color))
+    screen.fill(pygame.Color(config.background_color))
     paint_checked_pattern()
 
     # paint snake head and body
     for index, body in enumerate(snake_body):
-        body_rect = pygame.Rect(body[0], body[1], scale, scale)
+        body_rect = pygame.Rect(body[0], body[1], config.tile_size, config.tile_size)
 
         # draw head
         if index == 0:
@@ -282,11 +280,11 @@ def repaint():
             # draw corners
             else:
                 # get previous body positions relative to current body
-                previous_body_x = (previous_body[0] - body[0]) / scale
-                previous_body_y = (previous_body[1] - body[1]) / scale
+                previous_body_x = (previous_body[0] - body[0]) / config.tile_size
+                previous_body_y = (previous_body[1] - body[1]) / config.tile_size
                 # get next body positions relative to current body
-                next_body_x = (next_body[0] - body[0]) / scale
-                next_body_y = (next_body[1] - body[1]) / scale
+                next_body_x = (next_body[0] - body[0]) / config.tile_size
+                next_body_y = (next_body[1] - body[1]) / config.tile_size
 
                 # draw bottom right corner
                 if previous_body_x == -1.0 and next_body_y == -1.0 or previous_body_y == -1.0 and next_body_x == -1.0:
@@ -301,67 +299,74 @@ def repaint():
                 elif previous_body_y == -1.0 and next_body_x == 1.0 or previous_body_x == 1.0 and next_body_y == -1.0:
                     screen.blit(body_tr, body_rect)
     # paint food
-    fruit_rect = pygame.Rect(food_position[0], food_position[1], scale, scale)
+    fruit_rect = pygame.Rect(food_position[0], food_position[1], config.tile_size, config.tile_size)
     screen.blit(apple, fruit_rect)
 
 
 def game_over_screen():
-    game_over_state = True
+    global game_state
+    game_state = "game_over"
     if score > highscore:
         with open('highscore.dat', 'wb') as file:
             pickle.dump(score, file)
-    while game_over_state:
-        screen.fill(pygame.Color(background_color))
+    while game_state == "game_over":
+        # paint game over screen
+        screen.fill(pygame.Color(config.background_color))
         paint_checked_pattern()
 
-        font = pygame.font.SysFont('Arial', scale * 5)
-        render = font.render(f"Score: {score}", True, pygame.Color(255, 255, 255))
+        font = pygame.font.SysFont(config.font, config.tile_size * 5)
+        render = font.render(f"Score: {score}", True, pygame.Color(config.font_color))
         rect = render.get_rect()
-        rect.midtop = (window_width / 2, window_height / 2)
+        rect.midtop = (config.window_width / 2, config.window_height / 2)
         screen.blit(render, rect)
-        pygame.display.flip()
+        pygame.display.update()
 
+        # key handling
         for event in pygame.event.get():
             if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_q:
-                    handle_quit()
+                if event.key == pygame.K_q or event.key == pygame.K_ESCAPE:
+                    game_state = "menu"
+                    main_menu_loop()
                 if event.key == pygame.K_SPACE:
                     init_game()
-                    game_over_state = False
+                    game_state = "game"
+
         pygame.display.update()
-        refresh_controller.tick(speed)
+        refresh_controller.tick(config.speed)
 
 
 def game_over():
-    # out of window
-    if snake_position[0] < 0 or snake_position[0] > window_width:
+    # if snake head out of window
+    if snake_position[0] < 0 or snake_position[0] > config.window_width or snake_position[1] < 0 or snake_position[1] > config.window_height:
         game_over_screen()
-    if snake_position[1] < 0 or snake_position[1] > window_height:
-        game_over_screen()
+    # if snake hits own body
     for blob in snake_body[1:]:
         if snake_position[0] == blob[0] and snake_position[1] == blob[1]:
             game_over_screen()
 
 
 def paint_hud():
-    # paint score section
-    font = pygame.font.SysFont("Arial", scale)
-    render = font.render(f"Score: {score}", True, pygame.Color(255, 255, 255))
+    font = pygame.font.SysFont(config.font, config.tile_size)
+
+    # paint score section left aligned
+    render = font.render(f"Score: {score}", True, pygame.Color(config.font_color))
     rect = render.get_rect()
     screen.blit(render, rect)
 
-    # paint highscore section
-    render_highscore = font.render(f"Highscore: {highscore}", True, pygame.Color(255, 255, 255))
+    # paint highscore section right aligned
+    render_highscore = font.render(f"Highscore: {highscore}", True, pygame.Color(config.font_color))
     rect_highscore = render_highscore.get_rect()
-    rect_highscore.right = window_width
+    rect_highscore.right = config.window_width
     screen.blit(render_highscore, rect_highscore)
 
-    pygame.display.flip()
+    pygame.display.update()
 
 
 def game_loop():
     global movement_direction
-    while True:
+    global game_state
+    game_state = "game"
+    while game_state == "game":
         movement_direction = handle_keys()
         move_snake(movement_direction)
         eat_food()
@@ -369,34 +374,26 @@ def game_loop():
         paint_hud()
         game_over()
         pygame.display.update()
-        refresh_controller.tick(speed)
+        refresh_controller.tick(config.speed)
 
 
 def main_menu_loop():
-    menu = True
-    while menu:
-        screen.fill(pygame.Color(background_color))
+    init_game()
+    global game_state
+    game_state = "menu"
+    while game_state == "menu":
+        screen.fill(pygame.Color(config.background_color))
         paint_checked_pattern()
 
-        font = pygame.font.SysFont('Arial', scale)
+        font = pygame.font.SysFont(config.font, config.tile_size)
         render = font.render(f"Press space to Play", True, pygame.Color(255, 255, 255))
         rect = render.get_rect()
-        rect.midtop = (window_width / 2, window_height / 2)
+        rect.midtop = (config.window_width / 2, config.window_height / 2)
         screen.blit(render, rect)
-
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                handle_quit()
-            if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_SPACE:
-                    menu = False
-                    game_loop()
-                if event.key == pygame.K_q:
-                    handle_quit()
+        handle_keys()
         pygame.display.update()
-        refresh_controller.tick(speed)
+        refresh_controller.tick(config.speed)
 
 
 if __name__ == "__main__":
     main_menu_loop()
-    # game_loop()

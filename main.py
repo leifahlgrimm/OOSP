@@ -132,6 +132,8 @@ def pause_game():
                     game_state = "game"
                 elif event.key == pygame.K_q or event.key == pygame.K_ESCAPE:
                     exit_application()
+                elif event.key == pygame.K_m:
+                    toggle_background_music()
 
         # paint background
         screen.fill(pygame.Color(config.background_color))
@@ -330,6 +332,8 @@ def game_over_screen():
                 if event.key == pygame.K_SPACE:
                     init_game()
                     game_state = "game"
+                if event.key == pygame.K_m:
+                    toggle_background_music()
 
         pygame.display.update()
         refresh_controller.tick(config.speed)

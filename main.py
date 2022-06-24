@@ -131,20 +131,28 @@ def pause_game():
                 if event.key == pygame.K_SPACE:
                     game_state = "game"
                 elif event.key == pygame.K_q or event.key == pygame.K_ESCAPE:
-                    exit_application()
+                    game_state = "menu"
+                    main_menu_loop()
                 elif event.key == pygame.K_m:
                     toggle_background_music()
 
-        # paint background
-        screen.fill(pygame.Color(config.background_color))
-        paint_checked_pattern()
-
         # paint pause screen overlay
-        font = pygame.font.SysFont(config.font, config.tile_size)
-        render = font.render(f"Paused, to continue press Space, to quit press Q", True, pygame.Color(config.font_color))
+        font = pygame.font.Font(config.font, config.font_size_big)
+        render = font.render(f"Paused", True, pygame.Color(config.font_color), pygame.Color(config.background_color))
         rect = render.get_rect()
-        rect.midtop = (config.window_width / 2, config.window_height / 2)
+        rect.center = (config.window_width / 2, config.window_height / 2)
         screen.blit(render, rect)
+
+        font_small = pygame.font.Font(config.font, config.font_size_small)
+        render_continue = font_small.render("To continue press Space", True, pygame.Color(config.font_color), pygame.Color(config.background_color))
+        rect_continue = render_continue.get_rect()
+        rect_continue.midtop = rect.midbottom
+        screen.blit(render_continue, rect_continue)
+
+        render_quit = font_small.render("To quit to main menu press Q or ESC", True, pygame.Color(config.font_color), pygame.Color(config.background_color))
+        rect_quit = render_quit.get_rect()
+        rect_quit.midtop = rect_continue.midbottom
+        screen.blit(render_quit, rect_quit)
 
         pygame.display.update()
         refresh_controller.tick(config.speed)
@@ -316,11 +324,26 @@ def game_over_screen():
         screen.fill(pygame.Color(config.background_color))
         paint_checked_pattern()
 
-        font = pygame.font.SysFont(config.font, config.tile_size * 5)
-        render = font.render(f"Score: {score}", True, pygame.Color(config.font_color))
-        rect = render.get_rect()
-        rect.midtop = (config.window_width / 2, config.window_height / 2)
-        screen.blit(render, rect)
+        font_score = pygame.font.Font(config.font, config.font_size_big)
+        render_score = font_score.render(f"Score: {score}", True, pygame.Color(config.font_color),
+                                         pygame.Color(config.background_color))
+        rect_score = render_score.get_rect()
+        rect_score.center = (config.window_width / 2, config.window_height / 2)
+        screen.blit(render_score, rect_score)
+
+        font_keys = pygame.font.Font(config.font, config.font_size_small)
+        render_continue = font_keys.render("To play again press SPACE", True, pygame.Color(config.font_color),
+                                           pygame.Color(config.background_color))
+        rect_continue = render_continue.get_rect()
+        rect_continue.midtop = rect_score.midbottom
+        screen.blit(render_continue, rect_continue)
+
+        render_quit = font_keys.render("To quit to main menu press Q or ESC", True, pygame.Color(config.font_color),
+                                       pygame.Color(config.background_color))
+        rect_quit = render_quit.get_rect()
+        rect_quit.midtop = rect_continue.midbottom
+        screen.blit(render_quit, rect_quit)
+
         pygame.display.update()
 
         # key handling
@@ -350,7 +373,7 @@ def game_over():
 
 
 def paint_hud():
-    font = pygame.font.SysFont(config.font, config.tile_size)
+    font = pygame.font.Font(config.font, config.font_size_small)
 
     # paint score section left aligned
     render = font.render(f"Score: {score}", True, pygame.Color(config.font_color))
@@ -389,11 +412,25 @@ def main_menu_loop():
         screen.fill(pygame.Color(config.background_color))
         paint_checked_pattern()
 
-        font = pygame.font.SysFont(config.font, config.tile_size)
-        render = font.render(f"Press space to Play", True, pygame.Color(255, 255, 255))
-        rect = render.get_rect()
-        rect.midtop = (config.window_width / 2, config.window_height / 2)
-        screen.blit(render, rect)
+        font = pygame.font.Font(config.font, config.font_size)
+        render_play = font.render("Press space to Play", True, pygame.Color(config.font_color),
+                                  pygame.Color(config.background_color))
+        rect_play = render_play.get_rect()
+        rect_play.center = (config.window_width / 2, config.window_height / 2)
+        screen.blit(render_play, rect_play)
+
+        render_quit = font.render("Press Q or ESC to quit", True, pygame.Color(config.font_color),
+                                  pygame.Color(config.background_color))
+        rect_quit = render_quit.get_rect()
+        rect_quit.midtop = rect_play.midbottom
+        screen.blit(render_quit, rect_quit)
+
+        render_mute = font.render("Press M to mute/unmute music", True, pygame.Color(config.font_color),
+                                  pygame.Color(config.background_color))
+        rect_mute = render_mute.get_rect()
+        rect_mute.midtop = rect_quit.midbottom
+        screen.blit(render_mute, rect_mute)
+
         handle_keys()
         pygame.display.update()
         refresh_controller.tick(config.speed)

@@ -8,7 +8,10 @@ tile_size = 40
 speed = 8
 
 # Font
-font = 'Arial'
+font = 'font/SuperLegendBoy-4w8Y.ttf'
+font_size = 40
+font_size_big = 80
+font_size_small = 20
 
 # Colors
 background_color= (175,215,70)
